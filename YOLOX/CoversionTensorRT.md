@@ -17,7 +17,7 @@ python3 tools/export_onnx.py \
     -c yolox_s.pth \
     --output-name yolox_s.onnx \
     --opset 11 \
-    --batch-size 1
+    --batch-size 1 \
     --decode_in_inference
 ```
 When using a custom trained model, change te exp file. In directory YOLOX/exps/custom/yolox_custom.py
