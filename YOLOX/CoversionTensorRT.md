@@ -35,3 +35,5 @@ The command to locally convert the onnx framework into tensorRT:
 ```
 Jetson orin nano is capable of a 6Gb workspace, else workspace:4096M
 This will take 10-12 minutes
+
+NOTE: Everytime the software stack is updated i.e. jetpack update of tensorRT version change the conversions need to be done again. An engine file exported in older version is not forward compatible even for offline use
