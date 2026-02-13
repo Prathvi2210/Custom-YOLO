@@ -29,12 +29,11 @@ The command to locally convert the onnx framework into tensorRT:
     --onnx=yolox_s_standard.onnx \
     --saveEngine=yolox_s_standard.engine \
     --fp16 \
-    --memPoolSize=workspace:6144M \
+    --memPoolSize=workspace:4096M \
     --builderOptimizationLevel=5 \
     --useCudaGraph \
-    --profilingVerbosity=detailed
 ```
-Jetson orin nano is capable of a 6Gb workspace, else workspace:4096M
+Jetson orin nano is capable of a 6Gb:6144M workspace, else workspace:4096M
 This will take 10-12 minutes
 
 NOTE: Everytime the software stack is updated i.e. jetpack update of tensorRT version change the conversions need to be done again. An engine file exported in older version is not forward compatible even for offline use
