@@ -19,7 +19,7 @@ YOLOX training on google colab caused version compatibility issues which are doc
 !pip install -v -e .
 ```
 4) Create custom YOLOX experiment file. The file provided in the repo is in the exps/example/default directory and it is for default dataset
-5) Need to create one for custom dataset training: exps/example/custom/custom_yolox_s.py
+   Need to create one for custom dataset training: exps/example/custom/custom_yolox_s.py
 ```bash
 %%write exps/example/custom/custom_yolox_s.py
 from yolox.exp import Exp as MyExp
@@ -36,3 +36,26 @@ class Exp(MyExp):
         self.data_num_workers = 4
         self.eval_interval= 5
 ```
+
+5) Training command
+```bash
+!python tools/train.py \
+  -f exps/example/custom/custom_yolox_s.py \
+  -d 1 \
+  -b 16 \
+  --fp16 \
+  -o \
+  -c yolox_s.pth  \
+  --data ../yolox_data.yaml
+```
+This setup is meant to: use pretrained YOLOX_s weights, mixed precision enabled, optimized training defaults
+
+6) Evaluate
+```bash
+!python tools/eval.py \
+  -f exps/example/custom/custom_yolox_s.py \
+  -c YOLOX_outputs/custom_yolox_s/best_ckpt.pth \
+  -b 8 \
+  -d 1 \
+  --conf 0.01
+
