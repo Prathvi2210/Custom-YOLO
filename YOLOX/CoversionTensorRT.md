@@ -20,7 +20,7 @@ python3 tools/export_onnx.py \
     --batch-size 1 \
     --decode_in_inference
 ```
-When using a custom trained model, change te exp file. In directory YOLOX/exps/custom/yolox_custom.py
+When using a custom trained model, change the exp file. In directory YOLOX/exps/custom/yolox_custom.py
 This file should contain the custom training parameters
 
 The command to locally convert the onnx framework into tensorRT:
