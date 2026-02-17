@@ -18,6 +18,35 @@ YOLOX training on google colab caused version compatibility issues which are doc
 !pip install -r requirements.txt
 !pip install -v -e .
 ```
+This is the basic YOLOX setup
+Hit with the compatibility error for onnx-simplifier==0.4.10. This is written in the requirements.txt in YOLOX repo
+YOLOX is not python 3.12 ready so we get the packaging.version.InvalidVersion: 'unknown' error
+This is a known breakage for Python>=3.12
+
+Forcing python 3.10 in colab doesn't work, colab doesn't actually let you switch the system python anymore. The commands will look like they worked but the kernels will stay pinned to 3.12
+
+Only solution here is to avoid installing the onnx-simplifier to train
+```bash
+!pip install -e . --no-deps #install only yolox no dependencies
+```
+This also wont work because with python 3.12: pip 24.x, YOLOX uses legacy setup.py
+pip is trying PEP-660 editable builds and YOLOX does not support PEP-660
+```bash
+python setup.py develop #Installing YOLOX in legacy editable mode
+```
+In modern pip tools, this is also internally calling 
+```bash
+pip install -e . --use-pep517
+```
+Install only training-safe dependencies: 
+```bash
+!git clone https://github.com/Megvii-BaseDetection/YOLOX.git
+%cd YOLOX
+!pip install -U pip setuptools wheel
+!pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+!pip install opencv-python loguru tqdm tabulate psutil tensorboard pycocotools thop
+```
+
 4) Create custom YOLOX experiment file. The file provided in the repo is in the exps/example/default directory and it is for default dataset
    Need to create one for custom dataset training: exps/example/custom/custom_yolox_s.py
 ```bash
