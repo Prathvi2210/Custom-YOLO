@@ -63,7 +63,7 @@ class Exp(MyExp):
         self.random_size = (14, 26)
         self.max_epoch = 100 #first test with 5 epochs if working properly set the final value
         self.data_num_workers = 4
-        self.eval_interval= 5
+        self.eval_interval= 10 #set this according to the max_epoch value. It should be around 10% REASON HERE
 ```
 
 5) Training command
