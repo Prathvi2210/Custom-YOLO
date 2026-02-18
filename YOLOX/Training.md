@@ -4,13 +4,22 @@ YOLOX training on google colab caused version compatibility issues which are doc
 1) Setup Environment
 ```bash
 !nvidia-smi
+import torch
+print("Torch:", torch.__version__)
+print("CUDA:", torch.version.cuda)
+print("GPU OK:", torch.cuda.is_available())
+```
+Don't in colab:
+```
 !pip install -U torch torchvision torchaudio
 !pip install roboflow loguru tabulate
 ```
 2) Add your dataset either upload the zip files or folders or run the code snippet from roboflow in the correct format
    here I had added the dataset in yolov5 format because apparently it was closest to yolox working, turned out wrong later
-
-3) Clone YOLOX
+   YOLO deosn't train on yolov5 or v8 format
+   YOLOX doesn't train directly on raw Pascal VOC folders
+   It expects COCO-style annotations internally (optional, not a preference)
+4) Clone YOLOX
    Here I am using the default original repo provided by Megvii
 ```bash
 !git clone https://github.com/Megvii-BaseDetection/YOLOX.git
@@ -21,6 +30,7 @@ YOLOX training on google colab caused version compatibility issues which are doc
 This is the basic YOLOX setup
 Hit with the compatibility error for onnx-simplifier==0.4.10. This is written in the requirements.txt in YOLOX repo
 YOLOX is not python 3.12 ready so we get the packaging.version.InvalidVersion: 'unknown' error
+YOLOX's requirements.txt is NOT a 'runtime requirements' file. It is a 'full feature + export + legacy dev' requirements file
 This is a known breakage for Python>=3.12
 
 Forcing python 3.10 in colab doesn't work, colab doesn't actually let you switch the system python anymore. The commands will look like they worked but the kernels will stay pinned to 3.12
@@ -38,15 +48,25 @@ In modern pip tools, this is also internally calling
 ```bash
 pip install -e . --use-pep517
 ```
-Install only training-safe dependencies: 
+
+Instead final working commands on colab:
 ```bash
 !git clone https://github.com/Megvii-BaseDetection/YOLOX.git
 %cd YOLOX
-!pip install -U pip setuptools wheel
-!pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-!pip install opencv-python loguru tqdm tabulate psutil tensorboard pycocotools thop
+#install dependencies
+!pip install -U pip
+!sed '/onnx-simplifier/d' requirements.txt > requirements_train.txt
+!pip install -r requirements_train.txt
+#Editable install
+!pip instaall -v -e . --no-build-isolation --no-deps
 ```
 
+verify installation
+```bash
+import yolox
+from yolo.exp import get_exp
+print("YOLOX import OK")
+```
 4) Create custom YOLOX experiment file. The file provided in the repo is in the exps/example/default directory and it is for default dataset
    Need to create one for custom dataset training: exps/example/custom/custom_yolox_s.py
 ```bash
@@ -87,4 +107,11 @@ This setup is meant to: use pretrained YOLOX_s weights, mixed precision enabled,
   -b 8 \
   -d 1 \
   --conf 0.01
-
+```
+Golden rules:
+Never uninstall torch in cuda
+Never pin torch/ CUDA
+Never install YOLOX before torch
+Use official Megvii YOLOX repo
+Use colab's default PyTorch
+Editable install after deps
