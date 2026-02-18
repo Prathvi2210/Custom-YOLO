@@ -15,11 +15,21 @@ Don't in colab:
 !pip install roboflow loguru tabulate
 ```
 2) Add your dataset either upload the zip files or folders or run the code snippet from roboflow in the correct format
-   here I had added the dataset in yolov5 format because apparently it was closest to yolox working, turned out wrong later
-   YOLO deosn't train on yolov5 or v8 format
-   YOLOX doesn't train directly on raw Pascal VOC folders
+   here I had added the dataset in yolov5 format because apparently it was closest to yolox working, turned out wrong later.
+   YOLOX needs extra conversion setup to train on yolo format dataset
+   YOLOX doesn't train directly on raw Pascal VOC folders, it is older preference
    It expects COCO-style annotations internally (optional, not a preference)
-4) Clone YOLOX
+
+   Roboflow's current COCO export doesn't always create an annotations/ folder. Instead the annotations.json files are saved in the respective train/, valid/ and test/ folders along with the images. We need to point the dataset paths carefully.
+   Verify the number of classes in the json files, that number is needed for training:
+   ```bash
+   import json
+   with open("/content/dataset/train/_annotations.coco.json") as f:
+       data = json.load(f)
+   print("Num classes:", len(data["categories"]))
+   print("classes:", [c["name"] for c in data["categories"]])
+   ```
+3) Clone YOLOX
    Here I am using the default original repo provided by Megvii
 ```bash
 !git clone https://github.com/Megvii-BaseDetection/YOLOX.git
@@ -67,24 +77,21 @@ import yolox
 from yolo.exp import get_exp
 print("YOLOX import OK")
 ```
-4) Create custom YOLOX experiment file. The file provided in the repo is in the exps/example/default directory and it is for default dataset
-   Need to create one for custom dataset training: exps/example/custom/custom_yolox_s.py
+4) Create custom YOLOX experiment file. 
+   Need to create one for custom dataset training: exps/example/custom/yolox_s_rf.py
 ```bash
-%%write exps/example/custom/custom_yolox_s.py
-from yolox.exp import Exp as MyExp
-
-class Exp(MyExp):
-    def __init__(self):
-        super().__init__()
-        self.num_classes = 2
-        self.depth = 0.33
-        self.width = 0.5 #these 2 terms are what decide the parameters. i.e 0.33 and 0.5 means it is small model, 0.67 and 0.75 means it is medium model
-        self.input_size = (832x 832) #default yolo performance is on 640, but my camera was high definition so I trained in 832
-        self.random_size = (14, 26)
-        self.max_epoch = 100 #first test with 5 epochs if working properly set the final value
-        self.data_num_workers = 4
-        self.eval_interval= 10 #set this according to the max_epoch value. It should be around 10% REASON HERE
+cp exps/example/custom/yolox_s.py exps/example/custom/yolox_s_rf.py
 ```
+Open that file and make the following changes
+```bash
+self.data_dir = "/content/dataset"
+
+self.train_ann = "train/_annotations.coco.json"
+self.val_ann = "valid/_annotations.coco.json"
+
+self.num_classes = <number confirmedin step 2>
+```
+Initially keep epochs at min(1 to 5) to do a dry run before running full training
 
 5) Training command
 ```bash
