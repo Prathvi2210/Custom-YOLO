@@ -29,7 +29,10 @@ Don't in colab:
    print("Num classes:", len(data["categories"]))
    print("classes:", [c["name"] for c in data["categories"]])
    ```
-3) Clone YOLOX
+   Now we need to restructure the dataset: YOLOX always constructs the annotation path internally as: <dataset_directory>/annotations/instances_train2017.json
+   Same for val2017.json
+   And the images folders are to be renamed to: train2017 and val2017 too
+4) Clone YOLOX
    Here I am using the default original repo provided by Megvii
 ```bash
 !git clone https://github.com/Megvii-BaseDetection/YOLOX.git
@@ -82,14 +85,16 @@ print("YOLOX import OK")
 ```bash
 cp exps/example/custom/yolox_s.py exps/example/custom/yolox_s_rf.py
 ```
+Note: In the cloned repo only the yolox_s.py is available, no yolox_m.py or yolox_l.py. This is expected in some versions.
+So for training a medium or large model, the python file is to be derived. changing the self.depth and self.width to appropriate values.
 Open that file and make the following changes
 ```bash
 self.data_dir = "/content/dataset"
 
-self.train_ann = "train/_annotations.coco.json"
-self.val_ann = "valid/_annotations.coco.json"
+self.train_ann = "instances_train2017.json"
+self.val_ann = "instances_val2017.json"
 
-self.num_classes = <number confirmedin step 2>
+self.num_classes = <number confirmed in step 2>
 ```
 Initially keep epochs at min(1 to 5) to do a dry run before running full training
 
@@ -100,9 +105,7 @@ Initially keep epochs at min(1 to 5) to do a dry run before running full trainin
   -d 1 \
   -b 16 \
   --fp16 \
-  -o \
-  -c yolox_s.pth  \
-  --data ../yolox_data.yaml
+  -o 
 ```
 This setup is meant to: use pretrained YOLOX_s weights, mixed precision enabled, optimized training defaults
 
