@@ -86,7 +86,7 @@ print("YOLOX import OK")
 cp exps/example/custom/yolox_s.py exps/example/custom/yolox_s_rf.py
 ```
 Note: In the cloned repo only the yolox_s.py is available, no yolox_m.py or yolox_l.py. This is expected in some versions.
-So for training a medium or large model, the python file is to be derived. changing the self.depth and self.width to appropriate values.
+So for training a medium or large model, the python file is to be derived. changing the self.depth and self.width to appropriate values.(0.33, 0.5) for small model, (0.67, 0.75) for medium model.
 Open that file and make the following changes
 ```bash
 self.data_dir = "/content/dataset"
@@ -107,7 +107,8 @@ Initially keep epochs at min(1 to 5) to do a dry run before running full trainin
   --fp16 \
   -o 
 ```
-This setup is meant to: use pretrained YOLOX_s weights, mixed precision enabled, optimized training defaults
+YOLOX training saves results to YOLOX_outputs/yolox_s_rf
+To resume interupted training just add the line --resume to the training command
 
 6) Evaluate
 ```bash
