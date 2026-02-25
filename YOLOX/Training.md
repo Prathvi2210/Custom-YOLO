@@ -107,6 +107,7 @@ Initially keep epochs at min(1 to 5) to do a dry run before running full trainin
   --fp16 \
   -o 
 ```
+To train with pretrained model weights, faster and better accuracy, just add the standard yolox.pth file to the training command with '-c' prefix
 YOLOX training saves results to YOLOX_outputs/yolox_s_rf
 To resume interupted training just add the line --resume to the training command
 
