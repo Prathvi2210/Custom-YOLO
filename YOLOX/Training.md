@@ -1,4 +1,5 @@
-This project was done in 2026, where the google colab was defaulted to python 3.12.x version and did not allow being forced to 3.10.x
+This project was done in early 2026, where the google colab was defaulted to python 3.12.x version and did not allow being forced to 3.10.x
+Current Colab GPUs use CUDA 12.x. Older versions and their wheels are incompatible
 YOLOX training on google colab caused version compatibility issues which are documented below along with their practical solutions
 
 1) Setup Environment
@@ -29,9 +30,11 @@ Don't in colab:
    print("Num classes:", len(data["categories"]))
    print("classes:", [c["name"] for c in data["categories"]])
    ```
+   The json file can be opened on system or browser and it can directly be checked without any code
    Now we need to restructure the dataset: YOLOX always constructs the annotation path internally as: <dataset_directory>/annotations/instances_train2017.json
    Same for val2017.json
    And the images folders are to be renamed to: train2017 and val2017 too
+   JSON annotations have each image entry as train2017/xxxxx but roboflow physically stores in train/xxxxx. They are out of sync
 4) Clone YOLOX
    Here I am using the default original repo provided by Megvii
 ```bash
@@ -73,7 +76,8 @@ Instead final working commands on colab:
 #Editable install
 !pip instaall -v -e . --no-build-isolation --no-deps
 ```
-
+here even though onnx-simplifier is disabled from requirements.txt, when we run the editable install, pip drags onnx-simplifier back to install because YOLOX hardcodes dependencies in TWO places: requirements.txt and setup.py/pyproject.toml.
+Inside YOLOX'x packaging metadata it says to install onnx and onnx-simplifer. hence we have to install YOLO without its declared dependencies(--no-deps)
 verify installation
 ```bash
 import yolox
@@ -99,6 +103,9 @@ self.input_size = (H,W) #YOLO uses height, width format, roboflow uses width, he
 self.test_size = (H,W)
 
 self.max_epoch = 300
+self.warmup_epochs = 5 #Gradually increases learning rate to stabilize
+self.no_aug_epochs = 15 #Last epochs without mosaic/mixup
+
 self.data_num_workers = 4
 self.eval_interval = 5
 
@@ -122,8 +129,11 @@ Initially try to train fron scratch for few dry run epochs. If it works then fin
 YOLOX training saves results to YOLOX_outputs/yolox_s_rf
 To resume interupted training just add the line --resume to the training command
 
+Bigger more complex models use more memory so reduce the batch size when training them
+
 YOLOX does not accept --data
 That flag exists in v5,v8 etc. In YOLOX the dataset paths are defined inside the experiment file, not passed via command line
+Same as --max_epoch command. It should be in the exp file.
 
 6) Evaluate
 ```bash
@@ -141,3 +151,20 @@ Never install YOLOX before torch
 Use official Megvii YOLOX repo
 Use colab's default PyTorch
 Editable install after deps
+
+Training flags:
+Early epochs (15-20) will have:
+   high conf_loss
+   noisy cls_loss
+   near zero AP
+   First few epochs will run without mosaic while buffers initialize
+Mid Epochs :
+   AP rising
+   cls_loss separating clearly
+   stable validation loss
+End (last 15-20) epochs:
+   Mosaic and mixup (native to YOLOX) disabled immediately
+   AP improvement noticeable with the above point
+
+
+   
