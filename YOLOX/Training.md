@@ -14,11 +14,11 @@ Don't in colab:
 !pip install -U torch torchvision torchaudio
 !pip install roboflow loguru tabulate
 ```
-2) Add your dataset either upload the zip files or folders or run the code snippet from roboflow in the correct format
+2) Add your dataset either upload the zip files or folders or run the code snippet from roboflow in the correct format.
    here I had added the dataset in yolov5 format because apparently it was closest to yolox working, turned out wrong later.
    YOLOX needs extra conversion setup to train on yolo format dataset
-   YOLOX doesn't train directly on raw Pascal VOC folders, it is older preference
-   It expects COCO-style annotations internally (optional, not a preference)
+   Pascal VOC format is older preference
+   I have used COCO-JSON format. It expects COCO-style annotations internally (optional, not a preference)
 
    Roboflow's current COCO export doesn't always create an annotations/ folder. Instead the annotations.json files are saved in the respective train/, valid/ and test/ folders along with the images. We need to point the dataset paths carefully.
    Verify the number of classes in the json files, that number is needed for training:
@@ -95,6 +95,16 @@ self.train_ann = "instances_train2017.json"
 self.val_ann = "instances_val2017.json"
 
 self.num_classes = <number confirmed in step 2>
+self.input_size = (H,W) #YOLO uses height, width format, roboflow uses width, height format
+self.test_size = (H,W)
+
+self.max_epoch = 300
+self.data_num_workers = 4
+self.eval_interval = 5
+
+#Augmentation
+self.mosaic_prob = 0.8
+self.mixup_prob = 0.1
 ```
 Initially keep epochs at min(1 to 5) to do a dry run before running full training
 
@@ -107,10 +117,10 @@ Initially keep epochs at min(1 to 5) to do a dry run before running full trainin
   --fp16 \
   -o 
 ```
-To train with pretrained model weights, faster and better accuracy, just add the standard yolox.pth file to the training command with '-c' prefix
+To train with pretrained model weights, faster and better accuracy, just add the standard yolox.pth file to the training command with '-c' prefix. This prefix indicates to 'resume from an existing file'
 YOLOX training saves results to YOLOX_outputs/yolox_s_rf
 To resume interupted training just add the line --resume to the training command
-
+#CONTINUE FROM 3RD CHAT: dataset directory is little different
 6) Evaluate
 ```bash
 !python tools/eval.py \
