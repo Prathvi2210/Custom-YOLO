@@ -117,10 +117,14 @@ Initially keep epochs at min(1 to 5) to do a dry run before running full trainin
   --fp16 \
   -o 
 ```
-To train with pretrained model weights, faster and better accuracy, just add the standard yolox.pth file to the training command with '-c' prefix. This prefix indicates to 'resume from an existing file'
+To train with pretrained model weights, faster and better accuracy, just add the standard yolox.pth file to the training command with '-c' prefix. This prefix indicates to 'resume from an existing file'. 
+Initially try to train fron scratch for few dry run epochs. If it works then fine tune from pretrained weights
 YOLOX training saves results to YOLOX_outputs/yolox_s_rf
 To resume interupted training just add the line --resume to the training command
-#CONTINUE FROM 3RD CHAT: dataset directory is little different
+
+YOLOX does not accept --data
+That flag exists in v5,v8 etc. In YOLOX the dataset paths are defined inside the experiment file, not passed via command line
+
 6) Evaluate
 ```bash
 !python tools/eval.py \
