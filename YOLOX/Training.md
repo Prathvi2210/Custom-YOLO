@@ -166,5 +166,19 @@ End (last 15-20) epochs:
    Mosaic and mixup (native to YOLOX) disabled immediately
    AP improvement noticeable with the above point
 
-
+YOLOX outputs weights in .pth format
+Traditional yolo models have .pt files which are built as an end-to-end product with training, inference, export all wrapped in one. It contains the model weights, architecture metadata, pre/post processing assumptions which makes deployment for inference very easy.
+The .pth file is only raw PyTorch weights, not packaged deployable file. Here we control the pre/post processing, model architecture, custom NMS and edge optimization
+The repo does come with an official demo for initial use (tools/demo.py)
+Preferred option is to export it to ONNX framework and create .onnx file
+```bash
+python tools/export_onnx.py \
+   --output-name yolox_m.onnx \
+   -n yolox-m \
+   -c best_ckpt.pth
+```
+This can then be deployed using:
+ONNX runtime (CPU/CUDA: widely compatible)
+TensorRT (NVIDIA devices optimized)
+OpenVINO (Intel devices optimized)
    
