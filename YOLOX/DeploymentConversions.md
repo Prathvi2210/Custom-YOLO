@@ -1,3 +1,35 @@
+YOLOX outputs weights in .pth format
+Traditional yolo models have .pt files which are built as an end-to-end product with training, inference, export all wrapped in one. It contains the model weights, architecture metadata, pre/post processing assumptions which makes deployment for inference very easy.
+The .pth file is only raw PyTorch weights, not packaged deployable file. Here we control the pre/post processing, model architecture, custom NMS and edge optimization
+The repo does come with an official demo for initial use (tools/demo.py): download the .pth file and custom exps file (yolox_s_rf.py) locally
+Simple Inference command:
+```bash
+python tools/demo.py image \
+  -f yolox_s_rf.py \
+  -c best_ckpt.pth \
+  --conf 0.25 \
+  --nms 0.65 \
+  --tsize 832 \
+  --path your_image.jpg \
+  --device gpu
+```
+Preferred option is to export it to ONNX framework and create .onnx file
+This is the code snipped for converting .pth to .onnx on google drive
+```bash
+python tools/export_onnx.py \
+  -f exps/example/custom/yolox-s_rf.py \
+  -c YOLOX_outputs/yolox_s_rf/best_ckpt.pth \
+  --output-name yolox_m.onnx \
+  --input-size 832 832 \
+  --opset 11
+```
+This can then be deployed using:
+ONNX runtime (CPU/CUDA: widely compatible)
+TensorRT (NVIDIA devices optimized)
+OpenVINO (Intel devices optimized)
+
+ONNX conversion if preferred on local device if possible for which the theory and code is given below.
+
 TensorRT is the hardware-optimized format for jetson orin's GPU + Tensor cores, working on low latency and low power
 For best performance it is recommended that the computer vision models are used in tensorRT format
 Specifically the model file will look like TensorRTfp16.engine
