@@ -22,6 +22,8 @@ Don't in colab:
    I have used COCO-JSON format. It expects COCO-style annotations internally (optional, not a preference)
 
    Roboflow's current COCO export doesn't always create an annotations/ folder. Instead the annotations.json files are saved in the respective train/, valid/ and test/ folders along with the images. We need to point the dataset paths carefully.
+   YOLOX does online augmentation: Mosaic, MixUp, HSV, Random affine. Doing Disc-level augmentation does not multiply learning power but increase epoch time.
+   Required preprocessing: resize and auto-orient
    Verify the number of classes in the json files, that number is needed for training:
    ```bash
    import json
@@ -35,7 +37,7 @@ Don't in colab:
    Same for val2017.json
    And the images folders are to be renamed to: train2017 and val2017 too
    JSON annotations have each image entry as train2017/xxxxx but roboflow physically stores in train/xxxxx. They are out of sync
-4) Clone YOLOX
+3) Clone YOLOX
    Here I am using the default original repo provided by Megvii
 ```bash
 !git clone https://github.com/Megvii-BaseDetection/YOLOX.git
@@ -115,7 +117,29 @@ self.mixup_prob = 0.1
 ```
 Initially keep epochs at min(1 to 5) to do a dry run before running full training
 
-5) Training command
+5) Remember to connect the google drive to cokab, especially when using free compute. The GPU disconnects and the local storage is volatile
+Mount the Google Drive and create a folder for YOLOX checkpoints
+```bash
+from  google.colab import drive
+drive.mount('/content/drive')
+mkdir -p /content/drive/MyDrive/YOLOX_outputs
+```
+Remove local outputs and SYMLINK it
+```bash
+rm -f /content/YOLOX/YOLOX_outputs
+ln -s /content/drive/MyDrive/YOLOX_ouputs /content/YOLOX/YOLOX_outputs
+```
+ln = link
+-s = symbolic(soft) link
+this command creates second arg as a pointer (alias) for the first one
+Use ! prefix for linux shell commands like ls, cp, ln
+Use % prefix for IPython magic like %cd, %env
+Now the YOLOX_outputs path points to the folder in google drive
+This will save the outputs in a permanent storage automatically where it is retreivable.
+
+Another option is using rsync where manually you have to run the cell periodically for the outputs to be uploaded to google drive
+
+6) Training command
 ```bash
 !python tools/train.py \
   -f exps/example/custom/custom_yolox_s.py \
@@ -135,7 +159,7 @@ YOLOX does not accept --data
 That flag exists in v5,v8 etc. In YOLOX the dataset paths are defined inside the experiment file, not passed via command line
 Same as --max_epoch command. It should be in the exp file.
 
-6) Evaluate
+7) Evaluate
 ```bash
 !python tools/eval.py \
   -f exps/example/custom/custom_yolox_s.py \
@@ -165,20 +189,3 @@ Mid Epochs :
 End (last 15-20) epochs:
    Mosaic and mixup (native to YOLOX) disabled immediately
    AP improvement noticeable with the above point
-
-YOLOX outputs weights in .pth format
-Traditional yolo models have .pt files which are built as an end-to-end product with training, inference, export all wrapped in one. It contains the model weights, architecture metadata, pre/post processing assumptions which makes deployment for inference very easy.
-The .pth file is only raw PyTorch weights, not packaged deployable file. Here we control the pre/post processing, model architecture, custom NMS and edge optimization
-The repo does come with an official demo for initial use (tools/demo.py)
-Preferred option is to export it to ONNX framework and create .onnx file
-```bash
-python tools/export_onnx.py \
-   --output-name yolox_m.onnx \
-   -n yolox-m \
-   -c best_ckpt.pth
-```
-This can then be deployed using:
-ONNX runtime (CPU/CUDA: widely compatible)
-TensorRT (NVIDIA devices optimized)
-OpenVINO (Intel devices optimized)
-   
