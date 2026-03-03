@@ -14,6 +14,11 @@ torch is the main library that implements: tensors(like NumPy but faster), GPU a
 pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torch-2.5.0a0+872d972e41.nv24.08-cp310-cp310-linux_aarch64.whl
 pip install https://github.com/ultralytics/assets/releases/download/v0.0.0/torchvision-0.20.0a0+afc54f7-cp310-cp310-linux_aarch64.whl
 ```
+or
+```bash
+pip3 install torch torchvision \
+  --index-url https://download.pytorch.org/whl/cu126
+```
 Test CUDA compatibility for pytorch
 ```python
 import torch
@@ -51,10 +56,11 @@ Here cp310 indicates Python 3.10
 and nv24.xx indicated jetpack 6.x comatiblity, nv23 are for jetpack 5.x
 the wheel should be supported for the python version on your platform. NVIDIA hosts wheels under: https://developer.download.nvidia.com/compute/redist/jp/v60/pytorch/
 
-After the torch is installed and compiled with CUDA, clone YOLOX install it and then run the inference code
-
 Another error I faced while installing torch for cuda was with cuDNN.
 ```code
 ImportError: libcudnn.so.8: cannot open shared object file
 ```
 PyTorch cannot load CUDA kernels without cuDNN. Jetpack 6 ships cuDNN 9 not 8. Any PyTorch wheel linked against cuDNN 8 will not work.
+
+
+After the torch is installed and compiled with CUDA, clone YOLOX install it (disabled build isolation and no dependencies) then install dependencies manually expect onnx-simplifier (known issue on ARM/jetson, repo pins it to 0.4.10, that version builds from source and tries to read git tags to determine version, pip builds it in /tmp/....: not a git repo, or you can manually install a version of onnx-simplifier that works if needed) and then run the inference code
