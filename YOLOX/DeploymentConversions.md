@@ -14,14 +14,16 @@ python tools/demo.py image \
   --device gpu
 ```
 Preferred option is to export it to ONNX framework and create .onnx file
-This is the code snipped for converting .pth to .onnx on google drive
+This is the code snipped for converting .pth to .onnx on google colab. onnx-simplifier version error may be encountered here because YOLOX pins the version hard. Can skip the package like done in training.
+Install onnxscript and loguru for the following command:
 ```bash
 python tools/export_onnx.py \
   -f exps/example/custom/yolox-s_rf.py \
   -c YOLOX_outputs/yolox_s_rf/best_ckpt.pth \
   --output-name yolox_m.onnx \
   --input-size 832 832 \
-  --opset 11
+  --opset 18
+  --no-onnxsim
 ```
 This can then be deployed using:
 ONNX runtime (CPU/CUDA: widely compatible)
@@ -54,7 +56,12 @@ python3 tools/export_onnx.py \
 ```
 When using a custom trained model, change the exp file. In directory YOLOX/exps/custom/yolox_custom.py
 This file should contain the custom training parameters
-
+Here one step is skipped. Simplifying the onnx file
+```bash
+onnxsim yolox_s.onnx yolox_s_sim.onnx
+```
+In case the onnx export is done on colab, the ONNX IR version compatibility issues may arise.
+TensorRT 10.x doesn't need onnxsim, it can directly parse IR v10 ONNX models, no need to simplify
 The command to locally convert the onnx framework into tensorRT:
 ```bash
 /usr/src/tensorrt/bin/trtexec \
@@ -65,6 +72,8 @@ The command to locally convert the onnx framework into tensorRT:
     --builderOptimizationLevel=5 \
     --useCudaGraph \
 ```
+In TensorRT --explicitBatch is now implicit, it is used by default no need to use the flag, it will error
+YOLOX exports static ONNX by default where the size is fixed unless you explicitly set dynamic_axes during export, so there is no need to pass shape profile flags in the command
 Jetson orin nano is capable of a 6Gb:6144M workspace, else workspace:4096M
 This will take 10-12 minutes
 
