@@ -50,15 +50,16 @@ python3 tools/export_onnx.py \
     -f exps/default/yolox_s.py \
     -c yolox_s.pth \
     --output-name yolox_s.onnx \
-    --opset 11 \
+    --opset 13 \
     --batch-size 1 \
     --decode_in_inference
 ```
 When using a custom trained model, change the exp file. In directory YOLOX/exps/custom/yolox_custom.py
-This file should contain the custom training parameters
-Here one step is skipped. Simplifying the onnx file
+This file should contain the custom training parameters. The opset depends on the system tensorRT version
+Simplifying the onnx file
 ```bash
-onnxsim yolox_s.onnx yolox_s_sim.onnx
+pip install onnxsim
+python3 -m onnxsim yoloxs.onnx yoloxs_sim.onnx
 ```
 In case the onnx export is done on colab, the ONNX IR version compatibility issues may arise.
 TensorRT 10.x doesn't need onnxsim, it can directly parse IR v10 ONNX models, no need to simplify
