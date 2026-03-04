@@ -1,13 +1,32 @@
 Here I have discussed the setup of my edge device for deployment of YOLOX models
 I am using a Jetson Orin Nano super dev kit running Jetpack 6.2.1- cuda 12.6
-1) OpenCV
+1) NumPy and OpenCV
 ```bash
 pip install numpy==1.26.4
 pip install opencv-python==4.10.0.82
 ```
 Numpy 2.x is not safe for YOLOX install, keep it <2.0
 Latest openCV wheels may force numpy>2.0. This breaks ML frameworks, ensure to use compatible with numpy 1.26.4
-2) Pytorch
+2) PyCUDA (optional)
+```bash
+sudo apt install -y python3-dev build-essential libcuda1 cuda-cudart-dev-12-6
+
+pip3 install --user pycuda --no-build-isolation
+```
+OR
+NVIDIA CUDA Python bindings
+```bash
+pip3 install --user cuda-python numpy opencv-python
+```
+Test
+```python
+from cuda.bindings import driver #for cuda-python 13.x
+err = driver.cuInit(0)
+print("cuInit status:", err)
+```
+Expected ouput: cuInit status: 0
+0 = CUDA_SUCCESS
+3) Pytorch
 Install pytorch for jetpack version compatible and it should be CUDA compatible
 Pytorch should run with cuda not just cpu
 PyTorch is the deep learning framework (whole ecosystem)
