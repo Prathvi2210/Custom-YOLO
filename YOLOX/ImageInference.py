@@ -13,6 +13,10 @@ TRT_LOGGER = trt.Logger(trt.Logger.INFO)
 # Init CUDA (driver API)
 # -----------------------------
 driver.cuInit(0)
+#Stream creation (cuda-python 13.x)
+stream = driver.CUstream()
+err = driver.cuStreamCreate(stream, 0) #in cuda-python 13.x the signature of cuStreamCreate is CUresult cuStreamCreate(CUstream* phStream, unsigned int flags). i.e the stream is an output argument, it is not returned
+assert err == 0
 
 #If needed manual context creation is to be added here
 # -----------------------------
@@ -81,9 +85,12 @@ driver.cuMemcpyHtoD(
 # -----------------------------
 # Inference
 # -----------------------------
-#stream 0 for default, can create a custom stream later for live feed and fps performance
-context.execute_async_v3(0)
-#Inference on GPU
+#stream 0 for default, can create a custom stream for live feed, output display and fps performance
+context.execute_async_v3(stream) #Asynchronous TensorRT execution
+
+#synchronize the execution before copying ouput otherwise: TensorRT is still writing to GPU memory, Process segfaults nondeterministically
+driver.cuStreamSynchronize(stream)
+
 # -----------------------------
 # D2H copy
 # -----------------------------
@@ -104,22 +111,30 @@ detections = yolox_decode(
     conf_thresh=0.3,
     nms_thresh=0.45
 )
-#OpenCV does not accept fp32 images in [0,1] of RGB order. It needs uint8 in [0,255] reange and BGR order.
+#OpenCV does not accept fp32 images in [0,1] of RGB order. It needs uint8 in [0,255] reange and BGR order. uint is unsigned integar and it can store only non-negative whole numbers
 #We need to do the conversions here
 img_disp = (img.copy() * 255).astype(np.uint8)
 img_disp = cv2.cvtcolor(img_disp, cv2.COLOR_RGB2BGR)
+img_disp = np.ascontiguousarray(img_disp) #to avoid segmentation fault, the window is now explicitly initialized and the image is guaranteed contiguous uint8 BGR
 img_disp = draw_detections(img_disp, detections, CLASS_NAMES)
-
-cv2.namedWindow("YOLOX TensorRT", cv2.WINDOW_NORMAL)
-cv2.imshow("YOLOX TensorRT", img_disp) #OpenCV (GTK backend) is a little unstable on jetson when using Wayland display service. It is stable on X11
-cv2.waitKey(0)
-cv2.destroyAllWindows()
 
 print("Inference OK")
 print("Output elements:", host_buffers["output"].size) 
 #YOLOX uses 3 feature levels: P3 P4 and P5. The values vary with input size for inference. Based on the total value of these features, Output elements size here can help in verifying the number of classes in the custom value.
 # output format per row: [cx, cy, w, h, obj_conf, cls0, cls1, ....]
 print("First 10 values:", host_buffers["output"][:10]) #host_buffer is a dict, output tensor is accessed by name usually "output:
+
+cv2.namedWindow("YOLOX TensorRT", cv2.WINDOW_NORMAL)
+cv2.imshow("YOLOX TensorRT", img_disp)
+cv2.waitKey(0)
+while True:
+    if cv2.waitKey(1) & 0&FF == 27:
+        break #Press Esc to exit
+cv2.destroyAllWindows()
+
+driver.cuStreamDestroy(stream) #Destroy stream before exit, cleaner
+import os
+os._exit(0) #immediate process termination, no cleanup. sys.exit() still runs python+cuda destructors
 
 #Display of output in image window
 #Output display is done with helper functions
