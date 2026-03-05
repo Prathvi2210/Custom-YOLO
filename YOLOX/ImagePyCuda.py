@@ -114,7 +114,12 @@ def main():
     stream.synchronize() #Wait until all tasks in the stream are finished
 
     output = outputs[0][0] #first output tensor in host buffer
-    output = output.reshape(-1, output.shape[-1])
+    output = output.reshape(-1, output.shape[-1]) #reshape() changes the dimensions of a NumPy array without changing the data
+    #output tensors shape is of the type (1, 8400, 85)=batch, detections, values per detection. 85 values represent [x, y, w, h, objectness, class 0 score, class 1 score, ....]. 
+    #This is standard format because YOLO is trained on COCO which has 80 classes. [-1] tells numpy to automatically calculate this dimension, because custom models have variety of numbers of classes
+    #So NumPy determines how many rows are needed to keep the total number of elements unchanged after reshaping. After reshaping the result is (8400, 85).
+    #This is done because for post-processing it is easier to work with tensors without the batch dimension.
+    #Basically this line flattens all dimensions except the last one so the tensor becomes a 2D array where each row represents one detection and each column represents prediction attributes.
 
     detections = postprocess(output, scale, img.shape)
 
