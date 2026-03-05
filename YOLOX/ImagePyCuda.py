@@ -71,12 +71,18 @@ def main():
       #serialized means optimized model saved to disk, deserialization means reconstruct model in memory
       #The Engine object contains: optimized neural network, layer fusion, CUDA kernels, memory layout, TRT optimizations
 
-    context = engine.create_execution_context()
+    context = engine.create_execution_context() #runtime state of model execution. Engine is the factory blueprint, context is the running instance of the machine
+    #the context is the object that holds runtime states, binds i/o memory and runs the model. It manages things that change per inference run: input tensor shapes, memory binds, execution states
+    #One engine can have multiple contexts, this allows parallel inference. Good for video pipelines, multi-camera systems, high throughput servers
+    #Basically it does the process: read input GPU memory > run the network > write output GPU memory
 
-    # Allocate buffers
-    inputs, outputs, bindings = [], [], []
+    # Allocate buffers(memory locations for temporarily storing input and output data while the model runs. They exist to mainly move data between CPU and GPU.
+    #GPU cant directly read a numpy array like CPU. So we copy using buffers (memcpy) CPU is host and GPU is device
+    inputs, outputs, bindings = [], [], [] #In deep learning inference, buffers store: input imgs, intermediate tensors, model outputs
     stream = cuda.Stream()
-
+#In TRT bindings are the links between memory's I/O and the memory buffers that hold their data, they tell which buffer corresponds to each Input or Output when running inference
+#TRT doesn't know where the data is stored, bindings provide the mapping. Each input and output tensor of the model has one binding.
+#typical setup: bindings = [int(input_buffer), int(ouput_buffer)]. TRT now knows bindings[0] is the input memory
     for binding in engine:
         size = trt.volume(engine.get_binding_shape(binding))
         dtype = trt.nptype(engine.get_binding_dtype(binding))
