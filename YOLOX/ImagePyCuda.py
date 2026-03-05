@@ -79,15 +79,23 @@ def main():
     # Allocate buffers(memory locations for temporarily storing input and output data while the model runs. They exist to mainly move data between CPU and GPU.
     #GPU cant directly read a numpy array like CPU. So we copy using buffers (memcpy) CPU is host and GPU is device
     inputs, outputs, bindings = [], [], [] #In deep learning inference, buffers store: input imgs, intermediate tensors, model outputs
-    stream = cuda.Stream()
+    #these buffers are later used to store the images when they are being used in GPU. They are 2D arrays, for ex: inputs first row will be the first input buffer which will have 2 elements of host and device.
+
+    #stream is essentially a queue of GPU tasks, used to run GPU operations asynchronously(CPU can work while GPU is working) and in order(one after another)
+    stream = cuda.Stream() #without streams CPU waits for GPU at every step
+    
 #In TRT bindings are the links between memory's I/O and the memory buffers that hold their data, they tell which buffer corresponds to each Input or Output when running inference
 #TRT doesn't know where the data is stored, bindings provide the mapping. Each input and output tensor of the model has one binding.
 #typical setup: bindings = [int(input_buffer), int(ouput_buffer)]. TRT now knows bindings[0] is the input memory
     for binding in engine:
-        size = trt.volume(engine.get_binding_shape(binding))
+        #info needed for allocating GPU memory
+        size = trt.volume(engine.get_binding_shape(binding)) #how many elements(numbers) a tensor contains. the function in the bracet will return the values in the tensor and trt.volume will calculate the total i.e multiply the vaules in the tensor
         dtype = trt.nptype(engine.get_binding_dtype(binding))
-        host_mem = cuda.pagelocked_empty(size, dtype)
-        device_mem = cuda.mem_alloc(host_mem.nbytes)
+        #Allocation of memory buffers for TRT inference on CPU and GPU
+        host_mem = cuda.pagelocked_empty(size, dtype) #NumPy array in piied RAM
+        #Page-locked memory is fixed physical RAM location, Normal CPU memory can be moved around by OS/python
+        #Pinned memory allows much faster transfers between CPU and GPU as it doesn't require a temporary buffer to locate the data. 
+        device_mem = cuda.mem_alloc(host_mem.nbytes) #function inside bracket calculates how many bytes used by host buffer, so same can be allocated on GPu VRAM
         bindings.append(int(device_mem))
         if engine.binding_is_input(binding):
             inputs.append((host_mem, device_mem))
@@ -96,16 +104,16 @@ def main():
 
     img = cv2.imread(IMAGE_PATH)
     input_img, scale = preprocess(img)
-    np.copyto(inputs[0][0], input_img.ravel())
-
+    np.copyto(inputs[0][0], input_img.ravel()) #copy the preprocessed image data into the input buffer [line 81] that TRT will use for inference
+#ravel() flattens a multidimensional array into a 1D array of the total number (multiplied) of elements. So basically, flatten image tensor in one dimension and add it to inputs buffer.
     # Inference
-    cuda.memcpy_htod_async(inputs[0][1], inputs[0][0], stream)
-    context.execute_async_v2(bindings, stream.handle)
+    cuda.memcpy_htod_async(inputs[0][1], inputs[0][0], stream) #copy image tensor from host buffer [0],[0] to device buffer [0],[1], queued in the stream
+    context.execute_async_v2(bindings, stream.handle) #Execution of neural network in GPU, also queued in stream
     for out in outputs:
-        cuda.memcpy_dtoh_async(out[0], out[1], stream)
-    stream.synchronize()
+        cuda.memcpy_dtoh_async(out[0], out[1], stream) #only copy the image tensors that are in outputs, queued in the stream
+    stream.synchronize() #Wait until all tasks in the stream are finished
 
-    output = outputs[0][0]
+    output = outputs[0][0] #first output tensor in host buffer
     output = output.reshape(-1, output.shape[-1])
 
     detections = postprocess(output, scale, img.shape)
