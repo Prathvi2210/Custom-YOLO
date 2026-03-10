@@ -6,13 +6,39 @@ pip install numpy==1.26.4
 pip install opencv-python==4.10.0.82
 ```
 Numpy 2.x is not safe for YOLOX install, keep it <2.0
-Latest openCV wheels may force numpy>2.0. This breaks ML frameworks, ensure to use compatible with numpy 1.26.4
-2) PyCUDA (optional)
-```bash
-sudo apt install -y python3-dev build-essential libcuda1 cuda-cudart-dev-12-6
+Latest openCV wheels may force numpy>2.0. This breaks ML frameworks, ensure to use compatible with numpy 1.26.4.
 
-pip3 install --user pycuda --no-build-isolation
+2) PyCUDA
+   Verify CUDA headers exist:
+```bash
+ls /usr/local/cuda/include/cuda.h
 ```
+Expected: /usr/local/cuda/include/cuda.h
+  Export CUDA paths
+```bash
+export CUDA_ROOT=/usr/local/cuda
+export CUDA_HOME=/usr/local/cuda
+export PATH=/usr/local/cuda/bin:$PATH
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+export CPATH=/usr/local/cuda/include:$CPATH
+export C_INCLUDE_PATH=/usr/local/cuda/include:$C_INCLUDE_PATH
+export CPLUS_INCLUDE_PATH=/usr/local/cuda/include:$CPLUS_INCLUDE_PATH
+```
+Install PyCuda
+```bash
+pip3 install --no-cache-dir pycuda
+```
+Verify success:
+```bash
+python3 - << 'EOF'
+import pycuda.driver as cuda
+cuda.init()
+print("CUDA devices:", cuda.Device.count())
+print("Device 0:", cuda.Device(0).name())
+EOF
+```
+Expected: CUDA devices: 1
+Device 0: Orin Nano
 OR
 NVIDIA CUDA Python bindings
 ```bash
@@ -104,6 +130,14 @@ This will not work.
 
 After the torch is installed and compiled with CUDA, clone YOLOX install it (disabled build isolation and no dependencies) then install dependencies manually expect onnx-simplifier (known issue on ARM/jetson, repo pins it to 0.4.10, that version builds from source and tries to read git tags to determine version, pip builds it in /tmp/....: not a git repo, or you can manually install a version of onnx-simplifier that works if needed) and then edit the exp file, it defaults to coco model. Change it like it was in training and then run inference codes.
 
+Verify TensorRT on system
+```bash
+python3 - << 'EOF'
+import tensorrt as trt
+print("TensorRT:", trt.__version__)
+EOF
+```
+On JetPack 6.2.1 expected output: TensorRT: 10.3.x
 TO clear cache after fixing errors(to ensure YOLOX doesn't silently use old cached exp and errors:
 ```bash
 find ~/YOLOX -name "__pycache__" -type d -exec rm -rf {} +
