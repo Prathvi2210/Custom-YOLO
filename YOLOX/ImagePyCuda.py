@@ -112,6 +112,9 @@ def main():
         else:
             output_name = name
 
+    # 🔴 REQUIRED for TRT 10 even if shapes look static, this solves the sizing issue. My model was trained for 832x832 image size, the data passed for inference should match this.
+    context.set_input_shape(input_name, engine.get_tensor_shape(input_name)) #This should be done before allocating buffers
+
     input_h, input_w = get_input_hw(context, input_name)
 
     img = cv2.imread(IMAGE_PATH)
