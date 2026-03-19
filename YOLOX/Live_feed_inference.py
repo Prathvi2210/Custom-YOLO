@@ -2,8 +2,8 @@ import cv2
 import time
 import threading
 import numpy as np
-import signal
-import sys
+import signal # This python module lets you handle OS-level signals (like interrupts, termination requests, etc.)
+import sys # The sys module, lets you interact with the python interpreter, the OS. It is a bridge between your code and the system running it.
 import PySpin
 import tensorrt as trt
 import pycuda.driver as cuda
@@ -11,6 +11,7 @@ import vpi #Vision Programming Interface
 import queue
 
 from flask import Flask, Response
+from collections import deque
 
 cuda.init()
 device = cuda.Device(0)
@@ -21,7 +22,6 @@ main_ctx = device.make_context()
 # =========================
 # CONFIG
 # =========================
-
 MODEL_PATH = "yoloxs140.engine"
 CONF_THRESHOLD = 0.45
 PORT = 5000
@@ -37,7 +37,6 @@ t_inf = None
 frame_queue = queue.Queue(maxsize=1)
 output_queue = queue.Queue(maxsize=1)
 
-
 camera_fps = 0
 inference_fps = 0
 running = True
@@ -51,9 +50,6 @@ stream_lock = threading.Lock()
 # =========================
 # TEMPORAL FILTER
 # =========================
-
-from collections import deque
-
 TEMP_WINDOW = 5      # frames to remember
 TEMP_CONFIRM = 3     # detections needed
 
@@ -62,9 +58,9 @@ person_history = deque(maxlen=TEMP_WINDOW)
 # =========================
 # LOAD TENSORRT ENGINE
 # =========================
-
 print("Loading YOLOX TensorRT engine...")
 print("Model loaded.")
+
 # =========================
 # INIT FLIR  (UNCHANGED)
 # =========================
@@ -86,7 +82,6 @@ bayer_conversion = cv2.COLOR_BAYER_RG2RGB_EA #Edge aware demosaicing
 # =========================
 # CAMERA THREAD (UNCHANGED)
 # =========================
-
 def camera_thread():
     global camera_fps, running
 
@@ -95,13 +90,13 @@ def camera_thread():
 
     while running:
         try:
-            image_result = cam.GetNextImage(1000)
+            image_result = cam.GetNextImage(1000) # An SDK image object (not usable by numpy/openCV)
 
             if image_result.IsIncomplete():
                 image_result.Release()
                 continue
 
-            frame = image_result.GetNDArray()
+            frame = image_result.GetNDArray() # Converts an image from the SDK into a numpy array. It converts from (H,W) to (H,W,3)
             frame = cv2.cvtColor(frame, bayer_conversion)
             image_result.Release()
 
@@ -128,17 +123,20 @@ def camera_thread():
 # =========================
 
 def inference_thread():
-    ctx = device.make_context()
+    ctx = device.make_context() 
     try:
         global latest_frame, output_frame, inference_fps, running, true_fps
 
         TRT_LOGGER = trt.Logger(trt.Logger.INFO)
 
         with open(MODEL_PATH, "rb") as f:
-            runtime = trt.Runtime(TRT_LOGGER)
+            runtime = trt.Runtime(TRT_LOGGER)  #runtime is state of model execution. 
             engine = runtime.deserialize_cuda_engine(f.read())
     
-        context = engine.create_execution_context()
+        context = engine.create_execution_context() # Engine is the factory blueprint, context is the running instance of the machine.
+        #the context is the object that holds runtime states, binds i/o memory and runs the model. It manages things that change per inference run: input tensor shapes, memory binds, execution states.
+        #One engine can have multiple contexts, this allows parallel inference. Good for video pipelines, multi-camera systems, high throughput servers.
+        #Basically it does the process: read input GPU memory > run the network > write output GPU memory.
     
         for i in range(engine.num_io_tensors):
             name = engine.get_tensor_name(i)
@@ -151,11 +149,11 @@ def inference_thread():
     
         stream = cuda.Stream()
     
-        host_input = cuda.pagelocked_empty(
-            trt.volume((1, 3, INPUT_SIZEH, INPUT_SIZEW)),
+        host_input = cuda.pagelocked_empty( #allocates pinned CPU memory. Pinned memory is faster for CPU -> GPU transfer and avoids extra copies.
+            trt.volume((1, 3, INPUT_SIZEH, INPUT_SIZEW)), # 1x3x672x896=1,806,336 elements
             dtype=np.float32
-        )
-        device_input = cuda.mem_alloc(host_input.nbytes)
+        ) # This creates a CPU-side buffer (host memory) for the input image
+        device_input = cuda.mem_alloc(host_input.nbytes) # Allocates GPU memory for input tensor, size is same as host_input and stored in GPU-accessible memory
     
         output_shape = context.get_tensor_shape(output_name)
         host_output = cuda.pagelocked_empty(
@@ -187,7 +185,7 @@ def inference_thread():
             # -------------------------
             # Preprocess
             # -------------------------
-            #Trying with VPI resize function
+            #Trying with VPI resize function, instead of the cv2.resize function.
             with vpi.Backend.CUDA:
                 vpi_image = vpi.asimage(frame)
                 resized = vpi_image.rescale(
@@ -196,21 +194,28 @@ def inference_thread():
                     border=vpi.Border.CLAMP #Handle border pixels
                 )
                 img = resized.cpu()  #bring back to CPU for TRT copy
-            #img = cv2.resize(frame, (INPUT_SIZEW, INPUT_SIZEH))
-            img = img.astype(np.float32)
-            img = img.transpose(2, 0, 1)
-            img = np.expand_dims(img, axis=0)
-    
-            np.copyto(host_input, img.ravel())
-            cuda.memcpy_htod_async(device_input, host_input, stream)
-    
-            context.execute_async_v3(stream_handle=stream.handle)
-    
-            cuda.memcpy_dtoh_async(host_output, device_output, stream)
-            stream.synchronize()
+           
+            #Convert an OpenCV image into tensor format for the neural network.
+            img = img.astype(np.float32) # Because Neural Nets operate using floating point numbers.
+            img = img.transpose(2, 0, 1) # OPenCV stores images in HWC, deep learning frameworks usually expect CHW.
+            img = np.expand_dims(img, axis=0) # Here we add a batch dimension, because neural networks process batches of images.
+            np.copyto(host_input, img.ravel()) # copy the preprocessed image data into the input buffer [line 152] that TRT will use for inference.
+            # ravel() flattens a multidimensional array into a 1D array of the total number (multiplied) of elements. So basically, flatten image tensor in one dimension and add it to inputs buffer.
+            
+            #Inference
+            cuda.memcpy_htod_async(device_input, host_input, stream) # copy image tensor from host buffer [0],[0] to device buffer [0],[1], queued in the stream
+            #Execution of neural network in TensorRT GPU, also queued in stream.
+            context.execute_async_v3(stream_handle=stream.handle) # Actual inference in GPU. TensorRT 10 removed execute_async_v2
+            cuda.memcpy_dtoh_async(host_output, device_output, stream) # only copy the image tensors that are in outputs, queued in the stream
+            stream.synchronize() # Wait until all tasks in the stream are finished
     
             output = host_output.reshape(output_shape)
-            output = output.reshape(-1, output.shape[-1])
+            output = output.reshape(-1, output.shape[-1])  #reshape() changes the dimensions of a NumPy array without changing the data
+            #output tensors shape is of the type (1, 8400, 85)=batch, detections, values per detection. 85 values represent [x, y, w, h, objectness, class 0 score, class 1 score, ....]. 
+            #This is standard format because YOLO is trained on COCO which has 80 classes. [-1] tells numpy to automatically calculate this dimension, because custom models have variety of numbers of classes
+            #So NumPy determines how many rows are needed to keep the total number of elements unchanged after reshaping. After reshaping the result is (8400, 85).
+            #This is done because for post-processing it is easier to work with tensors without the batch dimension.
+            #Basically this line flattens all dimensions except the last one so the tensor becomes a 2D array where each row represents one detection and each column represents prediction attributes.
     
             # -------------------------
             # Vectorized Postprocess
@@ -220,7 +225,7 @@ def inference_thread():
             obj = 1.0 / (1.0 + np.exp(-output[:, 4]))
             cls_scores = 1.0 / (1.0 + np.exp(-output[:, 5:]))
     
-            cls_ids = np.argmax(cls_scores, axis=1)
+            cls_ids = np.argmax(cls_scores, axis=1) # Returns index of the max value. Which class has highest probabilty of being that object
             cls_conf = cls_scores[np.arange(len(cls_scores)), cls_ids]
             scores = obj * cls_conf
     
@@ -240,8 +245,8 @@ def inference_thread():
     
             if len(output) > 0:
     
-                boxes = output[:, :4]
-    
+                boxes = output[:, :4] # lists, they are simple, lightweight, ordered, mutable, duplicate values, indexed, dynamic sizes, nested but slow.
+                # Scale boxes back to original image
                 scale_x = orig_w / INPUT_SIZEW
                 scale_y = orig_h / INPUT_SIZEH
     
@@ -460,7 +465,10 @@ def safe_shutdown():
 signal.signal(signal.SIGINT, shutdown_handler)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  #Clean practice to use this function calling in python.
+#When a python file runs, python sets __name__ = "__main__".
+#When the file is imported as a module(import script) then __name__ = "script".
+#so structuring the code like this in main() and calling ensures that the code runs only when the file is executed directly.
     try:
         system, cam_list, cam = init_camera()
         
@@ -504,7 +512,6 @@ if __name__ == "__main__":
         # -------------------------
         # Acquisition Settings
         # -------------------------
-
         node_acq_mode = PySpin.CEnumerationPtr(
             nodemap.GetNode("AcquisitionMode")
         )
