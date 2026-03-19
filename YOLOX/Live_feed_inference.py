@@ -13,11 +13,12 @@ import queue
 from flask import Flask, Response
 from collections import deque
 
-cuda.init()
+cuda.init() # This line initializes the CUDA driver so program can start using the GPU
+# It loads cuda driver, detects available GPUs, prepares device contexts, initializes internal resources
 device = cuda.Device(0)
 
-# Temporary context to build engine
-main_ctx = device.make_context()
+# Temporary execution context to build engine
+main_ctx = device.make_context() 
 
 # =========================
 # CONFIG
@@ -127,7 +128,8 @@ def inference_thread():
     try:
         global latest_frame, output_frame, inference_fps, running, true_fps
 
-        TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+        TRT_LOGGER = trt.Logger(trt.Logger.INFO) #TRT uses a logging system to print messages to the console while running, the logger decides which messages should appear.
+        #This creates a logger with log level = INFO. It prints the INFO messages, Warning messages and error messages.
 
         with open(MODEL_PATH, "rb") as f:
             runtime = trt.Runtime(TRT_LOGGER)  #runtime is state of model execution. 
@@ -177,7 +179,8 @@ def inference_thread():
     
             orig_h, orig_w = frame.shape[:2]
             x1 = y1 = x2 = y2 = np.array([], dtype=int)
-            scores = np.array([], dtype=np.float32)
+            scores = np.array([], dtype=np.float32) # Here array is used instead of list because here we are not collecting data, we're doing vectorized operations. So array is much faster than looping over a list.
+            # NumPy arrays are contigous in memory, lists are arrays of pointers -> scattered memory. Arrays are cache-friendly and faster for computation.
             cls_ids = np.array([], dtype=int)
             final_indices = []
             
