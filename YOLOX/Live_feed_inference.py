@@ -227,15 +227,23 @@ def inference_thread():
             # Sigmoid
             obj = 1.0 / (1.0 + np.exp(-output[:, 4]))
             cls_scores = 1.0 / (1.0 + np.exp(-output[:, 5:]))
-    
+            '''Sigmoid as in maths function also called: logistic function or probability squashing function.
+            Neural networks often produce raw scores (logits) ranging from large negatives to large positives. But for inference (detection systems) we need values like probability of object, confidence score, binary classification output.
+            Sigmoid converts the logits(x) into these probabilities.
+            In YOLO detection heads, output is raw tensors not probabilities as seen in the output form, these values are the logits(too large) so sigmoid is applied to convert them.
+            For predicting box centers relative to grid sigmoid is used so as to keep the center offsets inside the grid cell (0-1 range)
+            Raw model predicts whether an object exists in the box, sigmoid converts that to probability of that object to exist in the box (0-1) giving the objectness score.
+            Similarly for predicting the class of the object, sigmoid gives the class probability and then confidence = objectness x class_prob'''
+
             cls_ids = np.argmax(cls_scores, axis=1) # Returns index of the max value. Which class has highest probabilty of being that object
             cls_conf = cls_scores[np.arange(len(cls_scores)), cls_ids]
             scores = obj * cls_conf
     
-            mask = scores > CONF_THRESHOLD
-            output = output[mask]
+            mask = scores > CONF_THRESHOLD #Mask is an array here consisting of boolean values (true/false). It keeps and discards values and basically acts as a filter.
+            output = output[mask] #Only keep rows where mask is true
             scores = scores[mask]
             cls_ids = cls_ids[mask]
+            #Instead of writing a loop for appending the filter, this gives a cleaner, GPU based, faster vectorized execution
     
             num_classes = output_shape[-1] - 5
     
@@ -390,16 +398,13 @@ def generate():
                 cv2.putText(frame, f"Inference FPS: {inference_fps}",
                             (10,60), cv2.FONT_HERSHEY_SIMPLEX,
                             0.8, (0,255,255), 2)
-                            
-                '''cv2.putText(frame, f"True_FPS: {true_fps:.2f}",
-                            (10,90), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.8, (0,255,255), 2)'''
+
             except queue.Empty:
                 continue
 
-            # Encode only when needed
-            ret, buffer = cv2.imencode(".jpg", frame)
-
+            # Encode only when needed, encoding an image (which is currently in Numpy array) into JPEG format in memory
+            ret, buffer = cv2.imencode(".jpg", frame) #Compress the image, encode it into chosen format, return it as a byte buffer (not saved to disk)
+            #ret is a boolean variable, true if encoding successful, false if it failed. Buffer is a numpy array or bytes containing the JPEG image
             if not ret:
                 continue
 
@@ -408,9 +413,12 @@ def generate():
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" +
                    buffer.tobytes() + b"\r\n")
+            # this is a part of a generator function used for video streaming. yield turns a function into a generator.
+            # return value ends the function whereas yield value pauses the function so it can continue later. in streaming you dont want to send one image and stop so use yield
 
     finally:
-        with stream_lock:
+        with stream_lock: #allows only one thread to enter the block. Acquire lock, run code, release lock automatically.
+            #If multiple threads(ex: inference and streaming) access together it can overlap and cause corrutped data
             active_clients -= 1
             if active_clients <= 0:
                 streaming_active = False
