@@ -30,6 +30,8 @@ ONNX runtime (CPU/CUDA: widely compatible)
 TensorRT (NVIDIA devices optimized)
 OpenVINO (Intel devices optimized)
 
+# Local conversion on device
+
 ONNX conversion if preferred on local device if possible for which the theory and code is given below.
 
 TensorRT is the hardware-optimized format for jetson orin's GPU + Tensor cores, working on low latency and low power
@@ -54,13 +56,16 @@ python3 tools/export_onnx.py \
     --batch-size 1 \
     --decode_in_inference
 ```
-When using a custom trained model, change the exp file. In directory YOLOX/exps/custom/yolox_custom.py
-This file should contain the custom training parameters. The opset depends on the system tensorRT version
-Simplifying the onnx file
+When using a custom trained model, change the exp file. In directory YOLOX/exps/custom/yolox_custom.py. Standard models have 80 classes, which could differ from the custom trained model.
+This file should contain the custom training parameters. The opset depends on the system tensorRT version.
+decode_in_inference maybe false by default which means the output is raw feature map predictions, not decoded boxes. without this sigmoids wont work and boxes cant be seen.
+
+Simplifying the onnx file- cleaned ONNX version: removes redundant nodes, folds constant operations, simplifies graph topology, fixes shape inference, reduces graph size.
 ```bash
 pip install onnxsim
 python3 -m onnxsim yoloxs.onnx yoloxs_sim.onnx
 ```
+Without onnxsim, the exporter gives raw ONNX: direct graph export, no post processing, larger graph, more redundant nodes, slightly less optimized.
 In case the onnx export is done on colab, the ONNX IR version compatibility issues may arise.
 TensorRT 10.x doesn't need onnxsim, it can directly parse IR v10 ONNX models, no need to simplify
 The command to locally convert the onnx framework into tensorRT:
